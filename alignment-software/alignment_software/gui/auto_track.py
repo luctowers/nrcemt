@@ -414,7 +414,6 @@ class ParticlePropertiesFrame(tk.Frame):
         return self.particle_color_var.get() == 1
 
 
-
 class ParticleTableFrame(tk.Frame):
     """Create a table which shows tracking locations, and frame ranges."""
 
