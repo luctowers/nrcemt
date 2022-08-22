@@ -1,3 +1,5 @@
+"""Coarse alignment step module."""
+
 import os
 from tkinter.messagebox import showerror, showinfo
 from alignment_software.engine.csv_io import (
