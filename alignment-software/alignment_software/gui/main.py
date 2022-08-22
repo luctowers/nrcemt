@@ -332,7 +332,6 @@ class ImageFrame(ttk.Frame):
         self.canvas.draw()
 
 
-
 class SequenceSelector(ttk.Frame):
     """
     The selector used to choose which image is selected in the main window.
