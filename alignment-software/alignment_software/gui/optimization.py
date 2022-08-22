@@ -1,9 +1,13 @@
 import os
+import tkinter as tk
+from tkinter import ttk
 from tkinter.messagebox import showerror, showinfo, showwarning
+from tkinter.filedialog import askopenfilename
 import numpy as np
 from alignment_software.engine.csv_io import (
     read_single_column_csv, write_columns_csv, write_single_column_csv
 )
+from .common import NumericSpinbox
 from alignment_software.engine.img_io import load_dm3, rewrite_dm3
 from alignment_software.engine.img_processing import (
     combine_tranforms,
@@ -13,7 +17,6 @@ from alignment_software.engine.img_processing import (
     transform_img,
     translate_transform
 )
-
 from alignment_software.engine.optimization import (
     compute_marker_shifts,
     compute_transformed_shift,
@@ -23,7 +26,9 @@ from alignment_software.engine.optimization import (
     optimize_tilt_angles,
     optimize_x_shift
 )
-from .window_optimization import OptimizationWindow
+
+
+ENTRY_WIDTH = 5
 
 
 class OptimizationStep:
@@ -257,3 +262,149 @@ class OptimizationStep:
     def focus(self):
         """Brings the optimization window to the top."""
         self.optimization_window.lift()
+
+
+class OptimizationWindow(tk.Toplevel):
+    """The main tomography optimization window."""
+
+    def __init__(self, master):
+        """Create the window."""
+        super().__init__(master)
+        self.title("Optimization Window")
+        self.resizable(False, False)
+
+        self.settings = OptimizationSettingsFrame(self)
+        self.settings.grid(row=0, column=0, sticky="nwse")
+
+        self.operations = OperationsFrame(self, text="Operations")
+        self.operations.grid(row=1, column=0, sticky="nwse")
+
+        self.optimize_button = ttk.Button(self, text="Optimize")
+        self.optimize_button.grid(row=2, column=0, sticky="nwse")
+
+
+class OperationsFrame(tk.LabelFrame):
+    """Frame containing optmization operation settings."""
+
+    def __init__(self, master, text):
+        """Create the frame."""
+        super().__init__(master, text=text, bd=1)
+        self.columnconfigure(0, weight=1)
+
+        self.operation_var = tk.StringVar(self, "fixrot-fixmag")
+
+        fixed_rotation = tk.Radiobutton(
+            self, text="Fixed rotation and magnification:",
+            value="fixrot-fixmag", variable=self.operation_var
+        )
+        fixed_rotation.grid(row=0, column=0, sticky="w")
+        one_rotation = tk.Radiobutton(
+            self, text="One rotation and fixed magnification",
+            value="onerot-fixmag", variable=self.operation_var
+        )
+        one_rotation.grid(row=1, column=0, sticky="w")
+        groupm_one_rotation = tk.Radiobutton(
+            self, text="Group magnifications and one rotation",
+            value="onerot-groupmag", variable=self.operation_var
+        )
+        groupm_one_rotation.grid(row=2, column=0, sticky="w")
+
+        groupm_group_rotation = tk.Radiobutton(
+            self, text="Group magnifications and group rotations",
+            value="grouprot-groupmag", variable=self.operation_var
+        )
+        groupm_group_rotation.grid(row=3, column=0, sticky="w")
+
+        self.input_angle = NumericSpinbox(
+            self, value_default=0, value_range=(0, 360), value_type=float,
+            width=ENTRY_WIDTH
+        )
+        self.input_angle.grid(row=0, column=1)
+
+        self.azimuth_var = tk.BooleanVar(self, False)
+        azimuth_check = tk.Checkbutton(
+            self, text="Adjust azimuth angle amount:",
+            variable=self.azimuth_var
+        )
+        azimuth_check.grid(row=4, column=0, sticky="w")
+        self.azimuth_input_angle = NumericSpinbox(
+            self, value_default=0, value_range=(0, 360), value_type=float,
+            width=ENTRY_WIDTH
+        )
+        self.azimuth_input_angle.grid(row=4, column=1)
+
+        self.tilt_group_var = tk.BooleanVar(self, False)
+        group_tilt_angles = tk.Checkbutton(
+            self, text="Group tilt angles", variable=self.tilt_group_var
+        )
+        group_tilt_angles.grid(row=5, column=0, sticky="w")
+
+        accuracy_label = tk.Label(self, text="Accuracy")
+        accuracy_label.grid(row=6, column=0, sticky="e")
+        self.accuracy_result = tk.Label(
+            self, text="0", bd=1, relief="solid",
+            bg="white", fg="black", width=ENTRY_WIDTH
+        )
+        self.accuracy_result.grid(row=6, column=1)
+
+
+class OptimizationSettingsFrame(tk.LabelFrame):
+    """Frame containing tilt angle settings."""
+
+    def __init__(self, master):
+        """Create the frame."""
+        super().__init__(master, text="Optimization Settings", bd=1)
+        self.columnconfigure(2, weight=1)
+
+        self.tilt_var = tk.StringVar(self, "constant")
+        self.tilt_var.trace('w', lambda a, b, c: self.update_selection())
+        constant_step = tk.Radiobutton(
+            self, text="Constant step", value="constant",
+            variable=self.tilt_var
+        )
+        constant_step.grid(row=0, column=0, sticky="w")
+        csv_file = tk.Radiobutton(
+            self, text="Csv file", value="csv", variable=self.tilt_var
+        )
+        csv_file.grid(row=1, column=0, sticky="w")
+
+        start_angle_label = tk.Label(self, text="Start angle:")
+        start_angle_label.grid(row=0, column=2)
+        self.start_angle = NumericSpinbox(
+            self, value_default=0, value_range=(0, 360), value_type=float,
+            width=ENTRY_WIDTH
+        )
+        self.start_angle.grid(row=0, column=3)
+
+        step_angle_label = tk.Label(self, text="Step angle:")
+        step_angle_label.grid(row=1, column=2)
+        self.step_angle = NumericSpinbox(
+            self, value_default=3, value_range=(0, 60), value_type=float,
+            width=ENTRY_WIDTH
+        )
+        self.step_angle.grid(row=1, column=3)
+
+        self.csv_button = ttk.Button(
+            self, text="open csv", command=self.open_csv
+        )
+        self.csv_button.grid(row=2, column=0, columnspan=2, sticky="we")
+        self.csv_path_var = tk.StringVar(self, "")
+        self.csv_entry = ttk.Entry(self, textvariable=self.csv_path_var)
+        self.csv_entry.grid(row=2, column=2, columnspan=2, sticky="we")
+        self.update_selection()
+
+    def update_selection(self):
+        """Called when tilt mode is changed."""
+        tilt_mode = self.tilt_var.get()
+        if tilt_mode == "csv":
+            self.csv_button.config(state="normal")
+            self.csv_entry.config(state="normal")
+        else:
+            self.csv_button.config(state="disabled")
+            self.csv_entry.config(state="disabled")
+
+    def open_csv(self):
+        """Prompts the user to enter a csv."""
+        filename = askopenfilename(filetypes=[("CSV File", "*.csv")])
+        if filename:
+            self.csv_path_var.set(filename)

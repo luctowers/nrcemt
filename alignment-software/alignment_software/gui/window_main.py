@@ -9,9 +9,9 @@ from .common import AsyncHandler
 from .contrast import ContrastStep
 from .loading import LoadingStep
 from .transform import TransformStep
-from .coarse_align.step_coarse_align import CoarseAlignStep
+from .coarse_align import CoarseAlignStep
 from .auto_track import AutoTrackStep
-from .optimization.step_optimization import OptimizationStep
+from .optimization import OptimizationStep
 from .frame_steps import StepsFrame
 from .frame_image import ImageFrame
 from .frame_sequence_selector import SequenceSelector
