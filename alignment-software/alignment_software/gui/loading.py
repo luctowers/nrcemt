@@ -1,3 +1,6 @@
+"""DM3 image sequence loading step module."""
+
+
 import pathlib
 from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import showerror

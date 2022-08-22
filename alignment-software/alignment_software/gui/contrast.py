@@ -1,3 +1,6 @@
+"""Contrast adjustment step module."""
+
+
 import os
 import numpy as np
 import tkinter as tk

@@ -1,3 +1,6 @@
+"""Transformation step module."""
+
+
 import tkinter as tk
 from tkinter import ttk
 import os
