@@ -8,7 +8,7 @@ from .manual_track.step_manual_track import ManualTrackStep
 from .common import AsyncHandler
 from .contrast.step_contrast import ContrastStep
 from .loading import LoadingStep
-from .transform.step_transform import TransformStep
+from .transform import TransformStep
 from .coarse_align.step_coarse_align import CoarseAlignStep
 from .auto_track import AutoTrackStep
 from .optimization.step_optimization import OptimizationStep
