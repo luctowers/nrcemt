@@ -1,4 +1,4 @@
-from alignment_software.gui.window_main import MainWindow
+from alignment_software.gui.main import MainWindow
 
 
 def main():
