@@ -1,8 +1,12 @@
 import os
-from tkinter.messagebox import showerror
-from ..common import AsyncHandler
-
 import numpy as np
+import tkinter as tk
+from tkinter import ttk
+from tkinter.messagebox import showerror
+import matplotlib.patches as patches
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from .common import AsyncHandler
 from alignment_software.engine.csv_io import (
     read_columns_csv, write_columns_csv
 )
@@ -11,7 +15,9 @@ from alignment_software.engine.img_processing import (
     convert_img_float64,
     reject_outliers_percentile
 )
-from .window_contrast import ContrastWindow
+
+INPUT_WIDTH = 10
+PADDING = 4
 
 
 class ContrastStep:
@@ -172,3 +178,131 @@ class ContrastStep:
     def focus(self):
         """Brings the contrast window to the top."""
         self.contrast_window.lift()
+
+
+class ContrastWindow(tk.Toplevel):
+    """Contrast window with histogram and tools for contrast adjustment."""
+
+    def __init__(self, master):
+        """Creates the window."""
+        super().__init__(master)
+        self.title("Contrast Adjustment Window")
+        self.geometry("360x360")
+        self.minsize(360, 360)
+
+        self.rowconfigure(1, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.tools = ContrastToolFrame(self)
+        self.tools.grid(row=0, column=0, sticky="w")
+        self.histogram = HistogramFrame(self)
+        self.histogram.grid(row=1, column=0, sticky="nswe")
+        self.progress_var = tk.DoubleVar(value=0.0)
+        progress = ttk.Progressbar(
+            self, orient="horizontal", variable=self.progress_var, max=1.0
+        )
+        progress.grid(row=2, column=0, sticky="we")
+
+
+class ContrastToolFrame(tk.Frame):
+    """Frame for the controls at the top of the contrast window."""
+
+    def __init__(self, master):
+        """Create the frame."""
+        super().__init__(master)
+
+        # Frame for Data Range
+        data_frame = tk.LabelFrame(self, bd=1, text="Data Range")
+        data_frame.grid(row=0, column=0, sticky="nwse")
+
+        # Frame for Scale Display Range
+        scale_frame = tk.LabelFrame(self, bd=1, text="Scale Display")
+        scale_frame.grid(row=0, column=1, sticky="nwse")
+
+        # Minimum data
+        min_label = ttk.Label(scale_frame, text="Minimum:")
+        min_label.grid(row=0, column=0, pady=PADDING)
+        min_range = tk.Frame(scale_frame)
+        self.min_range_val = ttk.Label(min_range, text="0")
+        self.min_range_val.pack()
+        min_range.grid(row=0, column=1, pady=PADDING)
+
+        # Max Data
+        max_label = ttk.Label(scale_frame, text="Maximum:")
+        max_label.grid(row=1, column=0, pady=PADDING)
+        max_range = tk.Frame(scale_frame)
+        self.max_range_val = ttk.Label(max_range, text="1")
+        self.max_range_val.pack()
+        max_range.grid(row=1, column=1, pady=PADDING)
+
+        self.discrete_var = tk.BooleanVar(value=True)
+        apply_discretely = ttk.Checkbutton(
+            data_frame, text="Adjust discretely",
+            variable=self.discrete_var
+        )
+        apply_discretely.grid(row=1, column=0)
+
+        eliminate_outliers = ttk.Label(data_frame, text="Rejection percentile")
+        eliminate_outliers.grid(row=0, column=0)
+        self.percentile_var = tk.DoubleVar(value=2.0)
+        outlier_percentile = ttk.Entry(
+            data_frame, textvariable=self.percentile_var, width=INPUT_WIDTH
+        )
+        outlier_percentile.grid(row=0, column=1)
+
+        slider_frame = tk.LabelFrame(self, bd=1, text="Manual adjustment")
+        slider_frame.grid(row=1, column=0, columnspan=2)
+        label_min = ttk.Label(slider_frame, text="min: ")
+        label_min.grid(row=0, column=0)
+        self.slider_min = ttk.Scale(slider_frame, length=300, value=0.0)
+        self.slider_min.grid(row=0, column=1)
+        label_max = ttk.Label(slider_frame, text="max: ")
+        label_max.grid(row=1, column=0)
+        self.slider_max = ttk.Scale(slider_frame, length=300, value=1.0)
+        self.slider_max.grid(row=1, column=1)
+
+        self.apply = ttk.Button(data_frame, text="Apply")
+        self.apply.grid(row=1, column=1)
+
+
+class HistogramFrame(tk.Frame):
+    """Frame for the histogram in the contrast window."""
+
+    def __init__(self, master, **kwargs):
+        """Create the frame."""
+        super().__init__(master, **kwargs)
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+        self.figure = Figure(figsize=(8, 8), dpi=100)
+        self.axis = self.figure.add_subplot()
+        self.canvas = FigureCanvasTkAgg(self.figure, self)
+        self.canvas.get_tk_widget().grid(column=0, row=0, sticky="nwse")
+        self.patch = None
+        self.hist = None
+
+    def render_histogram(self, image):
+        """Render the histogram given image data."""
+        image_flat = image.ravel()
+        image_max = image.max()
+        self.axis.clear()
+        self.axis.hist(image_flat, bins=100, range=(0, image_max))
+        self.axis.xaxis.set_ticks(
+            [0.0, 0.25*image_max, 0.5*image_max, 0.75*image_max, image_max],
+            labels=["0.0", "0.25", "0.5", "0.75", "1.0"]
+        )
+        self.axis.get_yaxis().set_visible(False)
+        self.canvas.draw()
+
+    def render_range(self, vmin, vmax):
+        """Render a box indication contrast range."""
+        if self.patch is not None:
+            self.patch.remove()
+        self.patch = patches.Rectangle(
+            (vmin, 0.1),
+            vmax-vmin, 0.8,
+            linewidth=1,
+            edgecolor='r',
+            facecolor='none',
+            transform=self.axis.get_xaxis_transform()
+        )
+        self.axis.add_patch(self.patch)
+        self.canvas.draw()
